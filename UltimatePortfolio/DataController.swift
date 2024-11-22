@@ -10,6 +10,7 @@ import CoreData
 class DataController: ObservableObject {
     let container: NSPersistentCloudKitContainer
     
+    var selectedIssue: Issue?
     var selectedFilter: Filter? = Filter.all
     
     static var preview: DataController = {
@@ -26,11 +27,25 @@ class DataController: ObservableObject {
         if inMemory{
             container.persistentStoreDescriptions.first?.url = URL(filePath: "/dev/null")
         }
+        
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        // In Changes are more important than remote changes
+        container.viewContext.mergePolicy = NSMergePolicy.mergeByPropertyObjectTrump
+        
+        container.persistentStoreDescriptions.first?.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+        NotificationCenter.default.addObserver(forName: .NSPersistentStoreRemoteChange, object: container.persistentStoreCoordinator, queue: .main, using: remoteStoreChanged)
+
+        
+
+        
         container.loadPersistentStores { storeDescription, error in
             if let error{
                 fatalError("Fatal error loading \(error.localizedDescription)")
             }
         }
+    }
+    func remoteStoreChanged(_ notification: Notification){
+        objectWillChange.send()
     }
     
     func createSampleData() {
@@ -68,6 +83,7 @@ class DataController: ObservableObject {
         
     }
     
+    
     private func delete(_ fetchRequest: NSFetchRequest<NSFetchRequestResult>){
         let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
         batchDeleteRequest.resultType = .resultTypeObjectIDs
@@ -86,5 +102,15 @@ class DataController: ObservableObject {
         delete(request2)
 
         save()
+    }
+    
+    func missingTags(from issue: Issue) -> [Tag] {
+        let request = Tag.fetchRequest()
+        let allTags = (try? container.viewContext.fetch(request)) ?? []
+
+        let allTagsSet = Set(allTags)
+        let difference = allTagsSet.symmetricDifference(issue.issueTags)
+
+        return difference.sorted()
     }
 }

@@ -36,7 +36,7 @@ struct SidebarView: View {
                         Label(filter.name, systemImage: filter.icon)
                             .badge(filter.tag?.tagActiveIssues.count ?? 0)
                     }
-                }
+                }.onDelete(perform: delete)
             }
         }
         .toolbar{
@@ -48,6 +48,13 @@ struct SidebarView: View {
             }
         }
         
+    }
+    
+    func delete(_ offsets: IndexSet){
+        for offset in offsets{
+            let item = tags[offset]
+            dataController.delete(item)
+        }
     }
 }
 
